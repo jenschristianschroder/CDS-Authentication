@@ -8,12 +8,12 @@
   "use strict";  
 
   //Set these variables to match your environment  
-  var organizationURI = "[YOUR ORGANIZATION URL]"; //The URL of your Common Data Service organization  
-  var tenant = "[YOUR TENANT].onmicrosoft.com"; //The name of the Azure AD organization you use  
-  var clientId = "[YOUR CLIENT ID]"; //The ClientId you got when you registered the application  
+  var organizationURI = "https://dpaas-dev.crm4.dynamics.com"; //The URL of your Common Data Service organization  
+  var tenant = "jschroder.onmicrosoft.com"; //The name of the Azure AD organization you use  
+  var clientId = "58a28601-4252-4dd0-b77b-d5ad72be3767"; //The ClientId you got when you registered the application  
   var pageUrl = "http://localhost:35614/JavaScript/Index.html"; //The URL of this page in your development environment when debugging.  
 
-  var user, authContext, message, errorMessage, loginButton, logoutButton, getAccountsButton, accountsTable, accountsTableBody;  
+  var user, currentUser, currentSystemUser, authContext, message, errorMessage, loginButton, logoutButton;  
 
   //Configuration data for AuthenticationContext  
   var endpoints = {  
@@ -36,14 +36,10 @@
     errorMessage = document.getElementById("errorMessage");  
     loginButton = document.getElementById("login");  
     logoutButton = document.getElementById("logout");  
-    getAccountsButton = document.getElementById("getAccounts");  
-    accountsTable = document.getElementById("accountsTable");  
-    accountsTableBody = document.getElementById("accountsTableBody");  
 
     //Event handlers on DOM elements  
     loginButton.addEventListener("click", login);  
     logoutButton.addEventListener("click", logout);  
-    getAccountsButton.addEventListener("click", getAccounts);  
 
     //call authentication function  
     authenticate();  
@@ -51,19 +47,17 @@
     if (user) {  
      loginButton.style.display = "none";  
      logoutButton.style.display = "block";  
-     getAccountsButton.style.display = "block";  
-
-     var helloMessage = document.createElement("p");  
-     helloMessage.textContent = "Hello " + user.profile.name;  
-     message.appendChild(helloMessage)  
+     authContext.acquireToken(organizationURI, getCurrentSystemUser);
+     
+     var userMessage = document.createElement("p");  
+     userMessage.textContent = user.userName;  
+     message.appendChild(userMessage)  
 
     }  
     else {  
      loginButton.style.display = "block";  
      logoutButton.style.display = "none";  
-     getAccountsButton.style.display = "none";  
     }  
-
    }  
   }  
 
@@ -86,7 +80,6 @@
     errorMessage.textContent = loginError;  
    }  
    user = authContext.getCachedUser();  
-
   }  
 
   //function that logs in the user  
@@ -96,104 +89,79 @@
   //function that logs out the user  
   function logout() {  
    authContext.logOut();  
-   accountsTable.style.display = "none";  
-   accountsTableBody.innerHTML = "";  
   }  
 
-//function that initiates retrieval of accounts  
-  function getAccounts() {  
-
-   getAccountsButton.disabled = true;  
-   var retrievingAccountsMessage = document.createElement("p");  
-   retrievingAccountsMessage.textContent = "Retrieving 10 accounts from " + organizationURI + "/api/data/v9.1/accounts";  
-   message.appendChild(retrievingAccountsMessage)  
-
-   // Function to perform operation is passed as a parameter to the acquireToken method  
-   authContext.acquireToken(organizationURI, retrieveAccounts)  
-
-  }  
-
-//Function that actually retrieves the accounts  
-  function retrieveAccounts(error, token) {  
-   // Handle ADAL Errors.  
-   if (error || !token) {  
-    errorMessage.textContent = 'ADAL error occurred: ' + error;  
-    return;  
-   }  
-
-   var req = new XMLHttpRequest()  
-   req.open("GET", encodeURI(organizationURI + "/api/data/v9.1/accounts?$select=name,address1_city&$top=10"), true);  
-   //Set Bearer token  
-   req.setRequestHeader("Authorization", "Bearer " + token);  
-   req.setRequestHeader("Accept", "application/json");  
-   req.setRequestHeader("Content-Type", "application/json; charset=utf-8");  
-   req.setRequestHeader("OData-MaxVersion", "4.0");  
-   req.setRequestHeader("OData-Version", "4.0");  
-   req.onreadystatechange = function () {  
-    if (this.readyState == 4 /* complete */) {  
-     req.onreadystatechange = null;  
-     if (this.status == 200) {  
-      var accounts = JSON.parse(this.response).value;  
-      renderAccounts(accounts);  
-     }  
-     else {  
-      var error = JSON.parse(this.response).error;  
-      console.log(error.message);  
-      errorMessage.textContent = error.message;  
-     }  
+  //Get current user  
+  function getCurrentSystemUser(error, token) {  
+    // Handle ADAL Errors.  
+    if (error || !token) {  
+      errorMessage.textContent = 'ADAL error occurred: ' + error;  
+      return;  
     }  
-   };  
-   req.send();  
-  }  
-  //Function that writes account data to the accountsTable  
-  function renderAccounts(accounts) {  
-   accounts.forEach(function (account) {  
-    var name = account.name;  
-    var city = account.address1_city;  
-    var nameCell = document.createElement("td");  
-    nameCell.textContent = name;  
-    var cityCell = document.createElement("td");  
-    cityCell.textContent = city;  
-    var row = document.createElement("tr");  
-    row.appendChild(nameCell);  
-    row.appendChild(cityCell);  
-    accountsTableBody.appendChild(row);  
-   });  
-   accountsTable.style.display = "block";  
-  }  
 
+    var req = new XMLHttpRequest()  
+    req.open("GET", encodeURI(organizationURI + "/api/data/v9.1/WhoAmI()"), true);  
+    //Set Bearer token  
+    req.setRequestHeader("Authorization", "Bearer " + token);  
+    req.setRequestHeader("Accept", "application/json");  
+    req.setRequestHeader("Content-Type", "application/json; charset=utf-8");  
+    req.setRequestHeader("OData-MaxVersion", "4.0");  
+    req.setRequestHeader("OData-Version", "4.0");  
+    req.onreadystatechange = function () {  
+      if (this.readyState == 4 /* complete */) {  
+      req.onreadystatechange = null;  
+      if (this.status == 200) {  
+        currentUser = JSON.parse(this.response);  
+        req.open("GET", encodeURI(organizationURI + "/api/data/v9.1/systemusers(" + currentUser.UserId + ")"), true);  
+        //Set Bearer token  
+        req.setRequestHeader("Authorization", "Bearer " + token);  
+        req.setRequestHeader("Accept", "application/json");  
+        req.setRequestHeader("Content-Type", "application/json; charset=utf-8");  
+        req.setRequestHeader("OData-MaxVersion", "4.0");  
+        req.setRequestHeader("OData-Version", "4.0");  
+        req.onreadystatechange = function () {  
+          if (this.readyState == 4 /* complete */) {  
+          req.onreadystatechange = null;  
+          if (this.status == 200) {  
+            currentSystemUser = JSON.parse(this.response);
+            var currentSystemUserMessage = document.createElement("p");  
+            currentSystemUserMessage.textContent = JSON.stringify(currentSystemUser);  
+            message.appendChild(currentSystemUserMessage);
+          }  
+          else {  
+            var error = JSON.parse(this.response).error;  
+            console.log(error.message);  
+            errorMessage.textContent = error.message;  
+          }  
+          }  
+        };  
+        req.send();  
+      }  
+      else {  
+        var error = JSON.parse(this.response).error;  
+        console.log(error.message);  
+        errorMessage.textContent = error.message;  
+      }  
+      }  
+    };  
+    req.send();  
+  }  
  </script>  
  <style>  
   body {  
    font-family: 'Segoe UI';  
   }  
 
-  table {  
-   border-collapse: collapse;  
-  }  
-
-  td, th {  
-   border: 1px solid black;  
-  }  
-
   #errorMessage {  
    color: red;  
   }  
 
-  #message {  
-   color: green;  
-  }  
  </style>  
 </head>  
 <body>  
  <button id="login">Login</button>  
  <button id="logout" style="display:none;">Logout</button>  
- <button id="getAccounts" style="display:none;">Get Accounts</button>  
  <div id="errorMessage"></div>  
  <div id="message"></div>  
- <table id="accountsTable" style="display:none;">  
-  <thead><tr><th>Name</th><th>City</th></tr></thead>  
-  <tbody id="accountsTableBody"></tbody>  
- </table>  
 </body>  
 </html>  
