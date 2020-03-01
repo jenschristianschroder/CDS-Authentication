@@ -1,0 +1,9 @@
+{
+    "resource": "https://[YOUR ORGANIZATION].crm4.dynamics.com",
+    "tenant" : "[YOUR TENANT ID]",
+    "authorityUrl" : "https://login.microsoftonline.com",
+    "clientId" : "[YOUR CLIENT ID]",
+    "clientSecret" : "[YOUR SECRET]",
+    "apiUrl": "https://[YOUR ORGANIZATION].api.crm4.dynamics.com/api/data/v9.1/"
+}
+    
